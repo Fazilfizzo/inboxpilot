@@ -1,13 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field
-
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 class EmailRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     sender: EmailStr
-
-    subject: str = Field(
-        min_length=2, max_length=200, description="Subject of the customer's email"
-    )
-
-    body: str = Field(
-        min_length=5, max_length=10000, description="Content of the customer's email"
-    )
+    subject: str = Field(min_length=2, max_length=200)
+    body: str = Field(min_length=5, max_length=10000)
