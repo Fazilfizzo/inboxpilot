@@ -1,18 +1,18 @@
-# InboxPilot
+# Mail_Genius
 
 **Intelligent Email Classification & Response Automation**
 
-InboxPilot is a Python-based email automation project designed to help businesses manage customer support emails more efficiently.
+Mail_Genius is a Python-based email automation project designed to help businesses manage customer support emails more efficiently.
 
-The system aims to retrieve incoming customer emails, validate and process email content, classify customer issues, determine priority and sentiment, generate AI-assisted response drafts, and organize the review and approval process before replies are sent.
+The system aims to retrieve incoming customer emails, validate and process email content, classify customer issues using AI, determine priority and sentiment, generate AI-assisted response drafts, and organize the review and approval process before replies are sent.
 
 The project is being developed incrementally, starting with a FastAPI-based classification API and progressing toward AI-powered email processing, Gmail integration, and external workflow services.
 
 ## Project Inspiration
 
-InboxPilot was inspired by the InboxPilot concept featured in [Arslan Manzoor's AgenticFlow Portfolio](https://github.com/arslanmanzoorr/agenticflow-portfolio).
+Mail_Genius was inspired by the InboxPilot concept featured in [Arslan Manzoor's AgenticFlow Portfolio](https://github.com/arslanmanzoorr/agenticflow-portfolio).
 
-The original portfolio describes InboxPilot as an AI email classifier and auto-responder using Python, FastAPI, OpenAI, Gmail API, and Airtable.
+The original portfolio describes an AI email classifier and auto-responder using Python, FastAPI, OpenAI, Gmail API, and Airtable.
 
 This repository is my independent learning and implementation project. I am using the original concept as inspiration while developing my own application structure, business logic, implementation decisions, and workflow.
 
@@ -25,7 +25,7 @@ The long-term objective is to build an intelligent email support automation work
 - Retrieve incoming customer emails from Gmail.
 - Parse and extract email content and metadata.
 - Validate and normalize incoming email data.
-- Classify emails by category.
+- Classify emails by category using AI.
 - Determine urgency and customer sentiment.
 - Generate AI-powered email summaries.
 - Generate contextual response drafts.
@@ -72,6 +72,7 @@ Development is organized into milestones, with each milestone introducing a spec
 - [x] Asynchronous AI request handling.
 - [x] Provider error handling and retry support.
 - [x] Configurable AI model and generation settings.
+- [x] Asynchronous provider resource cleanup.
 
 #### 2.3 Gmail Integration & AI Classification
 
@@ -104,9 +105,18 @@ Development is organized into milestones, with each milestone introducing a spec
 - [x] Enforce application-level email constraints.
 - [x] Convert parsed Gmail messages into the standard `EmailRequest` schema.
 
+**Gemini-Powered Email Classification**
+
+- [x] Implement AI-powered email classification service.
+- [x] Use the provider abstraction to keep classification independent of the AI provider implementation.
+- [x] Generate structured classification responses using Pydantic schemas.
+- [x] Add a dedicated AI classification API endpoint.
+- [x] Configure Gemini through environment variables.
+- [x] Reuse the application-wide AI provider through FastAPI dependencies and lifespan management.
+- [x] Preserve the original rule-based classification endpoint.
+
 **Upcoming Work**
 
-- [ ] 2.3.5 Gemini-powered email classification.
 - [ ] 2.3.6 Email deduplication and integration tests.
 
 #### 2.4 Email Summarization
@@ -128,7 +138,7 @@ Development is organized into milestones, with each milestone introducing a spec
 
 #### 2.7 Reliability & Cost Controls
 
-- [ ] Retry and timeout management.
+- [ ] Retry and timeout management improvements.
 - [ ] AI usage and cost controls.
 - [ ] Robust handling of external service failures.
 
@@ -142,10 +152,13 @@ Development is organized into milestones, with each milestone introducing a spec
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/health` | Check application health |
-| POST | `/api/v1/emails/classify` | Classify a customer email using the current rule-based classifier |
+| GET | `/api/v1/health` | Check application health |
+| POST | `/api/v1/emails/classify` | Classify a customer email using rule-based classification |
+| POST | `/api/v1/emails/classify/ai` | Classify a customer email using Google Gemini |
 
-The Gmail integration currently provides internal integration components. A dedicated API endpoint for triggering the complete Gmail-to-AI processing workflow has not yet been implemented.
+The two classification endpoints are intentionally separate. This allows the rule-based and AI-powered approaches to coexist.
+
+The Gmail integration currently provides internal components for authentication, message retrieval, parsing, and normalization. A complete automated Gmail-to-Gemini processing workflow has not yet been implemented.
 
 ## Classification Categories
 
@@ -158,6 +171,8 @@ The Gmail integration currently provides internal integration components. A dedi
 
 ### Classification Response
 
+Both classification endpoints return the same structured response schema.
+
 Example:
 
 ```json
@@ -169,7 +184,7 @@ Example:
 }
 ```
 
-The initial classifier uses keyword-based rules. Gemini integration is being developed separately, with AI-powered classification of incoming Gmail messages planned for Milestone 2.3.5.
+The rule-based classifier uses keyword-based rules, while the AI-powered classifier uses Google Gemini to interpret the meaning and context of customer emails.
 
 ## Technology Stack
 
@@ -187,7 +202,7 @@ The initial classifier uses keyword-based rules. Gemini integration is being dev
 
 | Technology | Purpose |
 |---|---|
-| Google Gemini API | AI-powered email processing |
+| Google Gemini API | AI-powered email classification and processing |
 | Google Gen AI SDK | Gemini API communication |
 | Tenacity | Retry handling for transient failures |
 
@@ -219,9 +234,22 @@ The initial classifier uses keyword-based rules. Gemini integration is being dev
 
 ## Architecture
 
-InboxPilot follows a modular architecture that separates API endpoints, business logic, data validation, AI providers, and external integrations.
+Mail_Genius follows a modular architecture that separates API endpoints, business logic, data validation, AI providers, and external integrations.
 
 The application uses an abstraction-based AI integration design so that application services do not depend directly on a specific AI provider implementation.
+
+### AI Provider Architecture
+
+The AI integration uses a provider abstraction:
+
+- `AIProvider` defines the common interface for AI providers.
+- `GeminiProvider` implements the interface using Google's Gen AI SDK.
+- `factory.py` creates the configured AI provider.
+- `AIClassificationService` uses the provider interface rather than directly depending on Gemini.
+- FastAPI dependencies retrieve the shared provider from application state.
+- FastAPI lifespan management initializes the provider during application startup and closes it during shutdown.
+
+This architecture makes the AI integration easier to maintain and allows additional AI providers to be introduced without rewriting application services.
 
 ### Email Processing Workflow
 
@@ -241,32 +269,36 @@ The intended workflow is:
    - Enforce application-level field constraints.
    - Produce a standardized email request.
 
-4. **AI Classification**
+4. **Email Deduplication**
+   - Check whether a Gmail message has already been processed.
+   - Prevent duplicate processing.
+
+5. **AI Classification**
    - Classify customer emails using Google Gemini.
    - Determine category, priority, and sentiment.
    - Identify emails requiring human review.
 
-5. **Email Summarization**
+6. **Email Summarization**
    - Generate concise summaries of customer emails.
 
-6. **Reply Generation**
+7. **Reply Generation**
    - Generate contextual response drafts.
 
-7. **Human Approval**
+8. **Human Approval**
    - Allow reviewers to review, edit, approve, or reject generated replies.
 
-8. **Email Delivery**
+9. **Email Delivery**
    - Send approved responses through Gmail.
 
-9. **Status Tracking**
-   - Track email processing, approval, delivery, and failure states.
+10. **Status Tracking**
+    - Track email processing, approval, delivery, and failure states.
 
-Steps 1–3 have implementation components in place. The remaining workflow is under development.
+Gmail authentication, message retrieval, parsing, and normalization components are implemented. AI classification is available through a separate API endpoint. Automated orchestration of the complete Gmail-to-AI workflow and the remaining steps are under development.
 
 ### Project Structure
 
 ```text
-inboxpilot/
+Mail_Genius/
 ├── app/
 │   ├── api/
 │   │   ├── dependencies.py
@@ -298,6 +330,7 @@ inboxpilot/
 │   │   ├── email.py
 │   │   └── gmail.py
 │   ├── services/
+│   │   ├── ai_classification_service.py
 │   │   ├── classification_service.py
 │   │   └── email_normalization_service.py
 │   └── main.py
@@ -315,7 +348,7 @@ inboxpilot/
 └── README.md
 ```
 
-The project structure will expand as AI processing, Airtable, and workflow components are introduced.
+The project structure will expand as email orchestration, deduplication, Airtable, and workflow components are introduced.
 
 ## Getting Started
 
@@ -328,14 +361,14 @@ The project structure will expand as AI processing, Airtable, and workflow compo
 
 ### 1. Clone the repository
 
-```bash
+```powershell
 git clone <YOUR_REPOSITORY_URL>
-cd inboxpilot
+cd Mail_Genius
 ```
 
 ### 2. Create a virtual environment
 
-```bash
+```powershell
 python -m venv .venv
 ```
 
@@ -366,13 +399,13 @@ Configure the required values in `.env`.
 Example:
 
 ```env
-APP_NAME=InboxPilot API
+APP_NAME=Mail Genius API
 APP_VERSION=1.0.0
 DEBUG=false
 
 AI_PROVIDER=gemini
 GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=your_supported_gemini_model_id
 
 AI_TEMPERATURE=0.2
 AI_MAX_OUTPUT_TOKENS=1000
@@ -383,6 +416,8 @@ GMAIL_TOKEN_FILE=token.json
 GMAIL_MAX_RESULTS=10
 GMAIL_QUERY=in:inbox
 ```
+
+Use a Gemini model ID supported by your Google AI Studio account and API access.
 
 Do not commit your actual `.env` file or API credentials.
 
@@ -415,7 +450,9 @@ Interactive API documentation:
 
 `http://127.0.0.1:8000/docs`
 
-## Example API Request
+## Example API Requests
+
+### Rule-Based Classification
 
 **POST** `/api/v1/emails/classify`
 
@@ -429,7 +466,21 @@ Request:
 }
 ```
 
-Response:
+### Gemini-Powered Classification
+
+**POST** `/api/v1/emails/classify/ai`
+
+Request:
+
+```json
+{
+  "sender": "customer@gmail.com",
+  "subject": "Payment problem",
+  "body": "I was charged twice and this is unacceptable. Please resolve immediately."
+}
+```
+
+Example response:
 
 ```json
 {
@@ -439,6 +490,8 @@ Response:
   "requires_human": true
 }
 ```
+
+Both endpoints use the same request and response schemas, making their outputs consistent and easier to compare.
 
 ## Testing
 
@@ -458,6 +511,12 @@ Run unit tests:
 
 ```powershell
 python -m pytest tests/unit -v
+```
+
+Run API tests:
+
+```powershell
+python -m pytest tests/api -v
 ```
 
 ## Code Quality
@@ -514,7 +573,7 @@ htmlcov/
 - [x] Milestone 2.3.2 — Gmail API client.
 - [x] Milestone 2.3.3 — Gmail email parsing.
 - [x] Milestone 2.3.4 — Email validation and normalization.
-- [ ] Milestone 2.3.5 — Gemini-powered email classification.
+- [x] Milestone 2.3.5 — Gemini-powered email classification.
 - [ ] Milestone 2.3.6 — Email deduplication and integration tests.
 - [ ] Milestone 2.4 — AI-powered email summarization.
 - [ ] Milestone 2.5 — AI-powered reply generation.
