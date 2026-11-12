@@ -42,3 +42,8 @@ Thumbs.db
 # Google OAuth credentials and tokens
 credentials.json
 token.json
+
+# Local database
+data/*.db
+data/*.db-shm
+data/*.db-wal

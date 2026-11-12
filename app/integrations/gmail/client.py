@@ -45,16 +45,21 @@ class GmailClient:
             ) from exc
 
     def list_messages(
-        self,
-        query: str | None = None,
-        max_results: int | None = None,
+            self,
+            query: str | None = None,
+            max_results: int | None = None,
     ) -> list[dict[str, str]]:
-        """Retrieve matching Gmail message IDs."""
+        """Retrieve matching Gmail message IDs and thread IDs."""
+        resolved_query = (
+            settings.gmail_query if query is None else query
+        )
+        resolved_max_results = (
+            settings.gmail_max_results
+            if max_results is None
+            else max_results
+        )
 
-        query = query or settings.gmail_query
-        max_results = max_results or settings.gmail_max_results
-
-        if max_results < 1:
+        if resolved_max_results < 1:
             raise ValueError("max_results must be positive.")
 
         try:
@@ -63,8 +68,8 @@ class GmailClient:
                 .messages()
                 .list(
                     userId="me",
-                    q=query,
-                    maxResults=max_results,
+                    q=resolved_query,
+                    maxResults=resolved_max_results,
                 )
                 .execute()
             )

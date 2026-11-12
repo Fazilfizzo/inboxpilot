@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     gmail_max_results: int = 10
     gmail_query: str = "in:inbox"
 
+    email_database_path: Path = Path("data/mail_genius.db")
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
