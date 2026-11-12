@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # AI
     ai_provider: Literal["mock", "gemini"] = "gemini"
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.8-flash"
     ai_temperature: float = 0.2
     ai_max_output_tokens: int = 1000
     ai_timeout_seconds: int = 30
